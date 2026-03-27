@@ -342,8 +342,6 @@ telnyx/_client.py module-level code executes
 | Indicator | Purpose |
 |-----------|---------|
 | `83[.]142[.]209[.]203:8080` | C2 server |
-| `hxxp://83[.]142[.]209[.]203:8080/hangup.wav` | Windows payload (PE binary in WAV) |
-| `hxxp://83[.]142[.]209[.]203:8080/ringtone.wav` | Linux payload (Python script in WAV) |
 | `hxxp://83[.]142[.]209[.]203:8080/` | Credential exfiltration endpoint (POST) |
 
 ### Files — Windows

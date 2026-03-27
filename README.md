@@ -20,8 +20,6 @@ Only attacker-controlled infrastructure is defanged. Legitimate services the mal
 | Defanged | Role |
 |----------|------|
 | `hXXp://83[.]142[.]209[.]203:8080/` | Credential exfiltration endpoint (POST) |
-| `hXXp://83[.]142[.]209[.]203:8080/ringtone.wav` | Linux payload (Python script hidden in WAV) |
-| `hXXp://83[.]142[.]209[.]203:8080/hangup.wav` | Windows payload (PE binary hidden in WAV) |
 
 ## Key Differences from litellm Compromise
 
