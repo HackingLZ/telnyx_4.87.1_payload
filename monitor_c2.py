@@ -2,13 +2,13 @@
 """
 C2 monitor — research tool for observing the telnyx C2 endpoint.
 
-Polls the C2 server every 60 seconds, logs all responses, and saves
-any new payloads to the payloads/ directory. Alerts (terminal bell)
-when a new payload URL appears.
+Polls the C2 server every 60 seconds across three endpoints:
+  /             — root (may return a URL or raw payload)
+  /ringtone.wav — Linux credential collector (WAV steganography)
+  /hangup.wav   — Windows PE binary (WAV steganography)
 
-The C2 at 83.142.209.203:8080 serves WAV files containing hidden
-payloads via steganography. This monitor watches for new URLs and
-downloads them for analysis.
+Logs all responses and saves any new payloads to the payloads/
+directory. Alerts (terminal bell) when a new response appears.
 
 Usage:
     python3 monitor_c2.py
@@ -21,7 +21,8 @@ import sys
 import time
 from datetime import datetime
 
-C2_URL = "http://83.142.209.203:8080/"
+C2_BASE = "http://83.142.209.203:8080"
+C2_PATHS = ["/", "/ringtone.wav", "/hangup.wav"]
 UA = "Mozilla/5.0"
 INTERVAL = 60
 OUTDIR = "payloads"
@@ -46,15 +47,15 @@ def beep():
         time.sleep(0.3)
 
 
-def fetch_c2():
+def fetch_url(url):
     try:
         req = urllib.request.Request(
-            C2_URL, headers={"User-Agent": UA}
+            url, headers={"User-Agent": UA}
         )
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.read()
     except Exception as e:
-        log(f"Fetch error: {e}")
+        log(f"Fetch error ({url}): {e}")
         return None
 
 
@@ -80,40 +81,50 @@ def download_url(url):
         return None
 
 
+def poll_endpoint(url, label, seen):
+    resp = fetch_url(url)
+    if resp is None:
+        log(f"[{label}] No response")
+        return
+
+    sha = hashlib.sha256(resp).hexdigest()
+    size = len(resp)
+    if sha in seen:
+        log(f"[{label}] Same response ({size} bytes, sha256={sha[:16]}...)")
+        return
+
+    log(f"[{label}] NEW RESPONSE: {size} bytes, sha256={sha}")
+    beep()
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = os.path.join(OUTDIR, f"{label}_{ts}_{sha[:8]}")
+    with open(filename, "wb") as f:
+        f.write(resp)
+    log(f"[{label}] Saved to {filename}")
+    seen.add(sha)
+
+    # If response looks like a URL, try downloading it too
+    try:
+        text = resp.decode("utf-8").strip()
+        if text.startswith("http"):
+            log(f"[{label}] Response is URL: {text}")
+            download_url(text)
+    except Exception:
+        pass
+
+    beep()
+
+
 def main():
-    log(f"Monitoring {C2_URL} every {INTERVAL}s")
+    log(f"Monitoring {C2_BASE} every {INTERVAL}s")
+    log(f"Endpoints: {C2_PATHS}")
     log(f"Payloads saved to {OUTDIR}/")
     seen = set()
 
     while True:
-        resp = fetch_c2()
-        if resp is None:
-            log("No response from C2")
-        else:
-            sha = hashlib.sha256(resp).hexdigest()
-            size = len(resp)
-            if sha in seen:
-                log(f"Same response ({size} bytes, sha256={sha[:16]}...)")
-            else:
-                log(f"NEW RESPONSE: {size} bytes, sha256={sha}")
-                beep()
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = os.path.join(OUTDIR, f"response_{ts}_{sha[:8]}")
-                with open(filename, "wb") as f:
-                    f.write(resp)
-                log(f"Saved to {filename}")
-                seen.add(sha)
-
-                # If response looks like a URL, try downloading it too
-                try:
-                    text = resp.decode("utf-8").strip()
-                    if text.startswith("http"):
-                        log(f"Response is URL: {text}")
-                        download_url(text)
-                except:
-                    pass
-
-                beep()
+        for path in C2_PATHS:
+            url = C2_BASE + path
+            label = path.strip("/") or "root"
+            poll_endpoint(url, label, seen)
 
         time.sleep(INTERVAL)
 
