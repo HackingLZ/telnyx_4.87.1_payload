@@ -1,0 +1,34 @@
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+venv/
+env/
+.venv/
+
+# Monitor tool artifacts
+payloads/
+c2_monitor.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Extracted wheels (analysis artifacts)
+extracted-*/
+telnyx/
+telnyx2/
+telnyx-clean/
+*.whl
