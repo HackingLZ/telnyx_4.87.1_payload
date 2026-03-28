@@ -168,6 +168,37 @@ A lock file (`msbuild.exe.lock`) with a hidden attribute prevents re-infection a
 - **Rate limiting** — 12-hour cooldown via `.lock` file prevents repeated C2 contact
 - **Self-hiding** — lock file is hidden via `attrib +h`
 
+### Deep analysis: `msbuild.exe` Windows implant → [`msbuild/`](msbuild/)
+
+The dropped `msbuild.exe` binary is a compiled build of the **[AdaptixC2](https://github.com/Adaptix-Framework/AdaptixC2)** open-source post-exploitation framework with TeamPCP's operator config. The PNG steganography wrapper was added by TeamPCP. Full reverse engineering is in the [`msbuild/`](msbuild/) directory:
+
+- **[`msbuild/ANALYSIS.md`](msbuild/ANALYSIS.md)** — complete analysis: execution chain, 35-command dispatch table, C2 traffic patterns, IOCs
+- **[`msbuild/outer_pe_msbuild_decompiled.c`](msbuild/outer_pe_msbuild_decompiled.c)** — annotated Ghidra decompilation of the outer PE (ntdll unhooking, PNG steganography, process injection)
+- **[`msbuild/inner_dll_implant_decompiled.c`](msbuild/inner_dll_implant_decompiled.c)** — annotated Ghidra decompilation of the inner implant DLL (C2 beacon, command handlers, SOCKS proxy, P2P mesh)
+- **[`msbuild/extract_config.py`](msbuild/extract_config.py)** — automated extraction script: outer PE → PNG → shellcode → DLL → RC4 config
+- **[`msbuild/stage1_embedded.png`](msbuild/stage1_embedded.png)** — steganographic PNG containing shellcode in RGBA pixels
+- **[`msbuild/stage4_decrypted_config.bin`](msbuild/stage4_decrypted_config.bin)** — decrypted C2 config blob (229 bytes)
+
+The implant's execution chain:
+
+```
+msbuild.exe (outer PE, 179,712 bytes)
+  ├─ Maps clean ntdll.dll from disk → resolves ~20 Nt* syscall numbers (EDR bypass)
+  ├─ Decodes embedded PNG from .data section via statically-linked stb_image
+  ├─ Extracts 95,743-byte shellcode from RGBA pixel channels (steganography)
+  ├─ Creates suspended dllhost.exe → injects shellcode via direct syscalls
+  └─ Shellcode = 1,023-byte reflective loader + inner DLL (file.dll)
+       └─ Inner DLL: full C2 implant with 35 commands
+            ├─ Beacon: HTTPS POST to checkmarx[.]zone:8443/telemetry/checkmarx.json
+            ├─ Filesystem: browse, read, write, upload, download, delete, list drives
+            ├─ Process: list (via NtQuerySystemInformation), execute, kill, interactive shell
+            ├─ Token theft: steal tokens, impersonate users, escalate privileges
+            ├─ Networking: SOCKS proxy, reverse port forwards, P2P mesh
+            └─ Stealth: direct syscalls, API hashing, char-by-char string construction
+```
+
+The C2 domain `checkmarx[.]zone` is the same implant C2 used in the litellm supply chain compromise, confirming shared backend infrastructure across both TeamPCP campaigns.
+
 ---
 
 ## Stage 0b: Linux Attack Path — `FetchAudio()`
@@ -341,15 +372,21 @@ telnyx/_client.py module-level code executes
 
 | Indicator | Purpose |
 |-----------|---------|
-| `83[.]142[.]209[.]203:8080` | C2 server |
+| `83[.]142[.]209[.]203:8080` | Delivery C2 (WAV steganography) |
 | `hxxp://83[.]142[.]209[.]203:8080/` | Credential exfiltration endpoint (POST) |
+| `checkmarx[.]zone:8443` | Implant C2 (HTTPS beacon from msbuild.exe) |
+| `/telemetry/checkmarx.json` | Implant C2 URI path |
+| `X-Content-ID` | Custom HTTP header in implant C2 comms |
+| `Mozilla/5.0 (Windows NT 6.2; rv:20.0) Gecko/20121202 Firefox/20.0` | Implant User-Agent |
 
 ### Files — Windows
 
 | Path | Description |
 |------|-------------|
-| `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\msbuild.exe` | Dropped PE binary (persistence) |
+| `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\msbuild.exe` | Dropped PE binary (persistence) — SHA256: `7290353a3bc2b18e9ea574d3294b09e28edaa6b038285bb101cf09760f187dcd` |
 | `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\msbuild.exe.lock` | Hidden lock file (rate limiting) |
+| `C:\Windows\System32\dllhost.exe` (spawned suspended) | Injection target for shellcode |
+| `\\.\pipe\%08lx` (random hex name) | Named pipe (implant fallback C2 / interactive shell) |
 
 ### Files — Linux
 
@@ -372,6 +409,7 @@ telnyx/_client.py module-level code executes
 | Exfil filename `tpcp.tar.gz` | Yes |
 | AES-256-CBC + RSA-4096 OAEP encryption scheme | Yes |
 | `X-Filename` exfil header | Yes |
+| `checkmarx[.]zone` implant C2 domain | Yes — same C2 backend |
 | TeamPCP threat group attribution | Yes |
 
 ---
@@ -387,5 +425,5 @@ telnyx/_client.py module-level code executes
    ```
 3. **Rotate ALL credentials** — SSH keys, cloud IAM, K8s tokens, API keys, database passwords, registry tokens
 4. **Audit:** Check for unauthorized access using stolen credentials
-5. **Network:** Block `83[.]142[.]209[.]203` at firewall/DNS level
+5. **Network:** Block `83[.]142[.]209[.]203` and `checkmarx[.]zone` at firewall/DNS level
 6. **Verify package integrity:** `pip show telnyx` — ensure version is not 4.87.1 or 4.87.2

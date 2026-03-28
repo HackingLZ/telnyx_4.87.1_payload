@@ -1,0 +1,63 @@
+{
+  "stage0_outer_pe": {
+    "file": "7290353a3bc2b18e9ea574d3294b09e28edaa6b038285bb101cf09760f187dcd",
+    "description": "Outer PE loader \u2014 PNG steganography + ntdll unhooking + process hollowing into dllhost.exe",
+    "md5": "d528effabbd9cd66aaa11bc8777bb110",
+    "sha256": "7290353a3bc2b18e9ea574d3294b09e28edaa6b038285bb101cf09760f187dcd",
+    "size": 179712
+  },
+  "stage1_embedded_png": {
+    "file": "stage1_embedded.png",
+    "description": "PNG image embedded in outer PE .data section at VA 0x14000b120 \u2014 contains steganographic shellcode in RGBA pixel channels",
+    "md5": "72a1275f5ddb068d3b51bf50791d4f79",
+    "sha256": "7e270255567866d37ad56e3f06977b695e39530eede74a10a0848ba71560cb45",
+    "size": 128421,
+    "extraction": "File offset 0x9920, size 0x1f5a5 (128421 bytes)"
+  },
+  "stage2_shellcode": {
+    "file": "stage2_shellcode.bin",
+    "description": "Shellcode extracted from PNG pixel RGB channels \u2014 reflective loader stub + inner DLL",
+    "md5": "d3d1e64adfe0a6f3769353fe05df9f18",
+    "sha256": "b92bd082bbd7d238089b2bb87d9cbf01be1bf8ab7213b67e9d27108e052ef75c",
+    "size": 95743,
+    "extraction": "RGBA pixel data: first pixel (BE uint32) = size (95743), bytes extracted from G,B of pixel 1 then R,G,B of pixels 2+"
+  },
+  "stage3a_reflective_loader": {
+    "file": "stage3a_reflective_loader.bin",
+    "description": "Reflective DLL loader stub \u2014 x86-64 shellcode that finds embedded MZ, maps PE sections, resolves imports, calls DllMain + GetVersions export",
+    "md5": "7f99dace07c56e3b2ad6abf690984844",
+    "sha256": "26b689749bc57991cbae2aab8ab6cf5acab6c64db4829ba2b1ced6c60d99a7a8",
+    "size": 1023
+  },
+  "stage3b_implant_dll": {
+    "file": "stage3b_implant.dll",
+    "description": "C2 implant DLL (file.dll) \u2014 WinINet HTTP beacon with ConnectorHTTP class, RC4-encrypted config in .rdata, export: _Z11GetVersionsv",
+    "md5": "217e86944372006f89b405b33d905884",
+    "sha256": "dafc1cc5d39bc303562d8587b698b6351e843b77c01764efa8b423a36b88fa6d",
+    "size": 94720
+  },
+  "stage4_decrypted_config": {
+    "file": "stage4_decrypted_config.bin",
+    "description": "RC4-decrypted C2 configuration blob from implant DLL .rdata section",
+    "md5": "0d784c53857ec1677555e33d7996fcfa",
+    "sha256": "1fdf1add3776bf91b28bdb2864afa1d24224a89f76f8705297d69bb9b4493cb7",
+    "size": 229,
+    "rc4_key": "331ab9c032cf95c89d877ee05b46f8d8",
+    "encrypted_offset": ".rdata+0x000 (file offset 0x16600 in inner DLL)",
+    "extracted_config": {
+      "c2_server": "checkmarx.zone",
+      "c2_port": 8443,
+      "method": "POST",
+      "uri": "/telemetry/checkmarx.json",
+      "header": "X-Content-ID",
+      "user_agent": "Mozilla/5.0 (Windows NT 6.2; rv:20.0) Gecko/20121202 Firefox/20.0"
+    },
+    "strings": [
+      "checkmarx.zone",
+      "POST",
+      "/telemetry/checkmarx.json",
+      "X-Content-ID",
+      "Mozilla/5.0 (Windows NT 6.2; rv:20.0) Gecko/20121202 Firefox/20.0"
+    ]
+  }
+}
